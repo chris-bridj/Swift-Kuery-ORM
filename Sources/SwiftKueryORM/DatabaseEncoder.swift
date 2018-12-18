@@ -27,6 +27,8 @@ open class DatabaseEncoder {
     try value.encode(to: databaseEncoder)
     return databaseEncoder.values
   }
+
+  public required init() { }
 }
 
 fileprivate class _DatabaseEncoder: Encoder {

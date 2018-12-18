@@ -21,6 +21,9 @@ import Dispatch
 
 /// Protocol Model conforming to Codable defining the available operations
 public protocol Model: Codable {
+  associatedtype ModelDecoder: DatabaseDecoder = DatabaseDecoder
+  associatedtype ModelEncoder: DatabaseEncoder = DatabaseEncoder
+
   /// Defines the tableName in the Database
   static var tableName: String {get}
   /// Defines the id column name in the Database
@@ -223,7 +226,7 @@ public extension Model {
     var values: [String : Any]
     do {
       table = try Self.getTable()
-      values = try DatabaseEncoder().encode(self)
+      values = try ModelEncoder().encode(self)
     } catch let error {
       onCompletion(nil, Self.convertError(error))
       return
@@ -241,7 +244,7 @@ public extension Model {
     var values: [String : Any]
     do {
       table = try Self.getTable()
-      values = try DatabaseEncoder().encode(self)
+      values = try ModelEncoder().encode(self)
     } catch let error {
       onCompletion(nil, nil, Self.convertError(error))
       return
@@ -259,7 +262,7 @@ public extension Model {
     var values: [String: Any]
     do {
       table = try Self.getTable()
-      values = try DatabaseEncoder().encode(self)
+      values = try ModelEncoder().encode(self)
     } catch let error {
       onCompletion(nil, Self.convertError(error))
       return
@@ -470,7 +473,7 @@ public extension Model {
 
           var decodedModel: Self
           do {
-            decodedModel = try DatabaseDecoder().decode(Self.self, dictionaryTitleToValue)
+            decodedModel = try ModelDecoder().decode(Self.self, dictionaryTitleToValue)
           } catch {
             onCompletion(nil, Self.convertError(error))
             return
@@ -535,7 +538,7 @@ public extension Model {
 
           var decodedModel: Self
           do {
-            decodedModel = try DatabaseDecoder().decode(Self.self, dictionaryTitleToValue)
+            decodedModel = try ModelDecoder().decode(Self.self, dictionaryTitleToValue)
           } catch {
             onCompletion(nil, nil, Self.convertError(error))
             return
@@ -593,7 +596,7 @@ public extension Model {
           for dictionary in dictionariesTitleToValue {
             var decodedModel: Self
             do {
-              decodedModel = try DatabaseDecoder().decode(Self.self, dictionary)
+              decodedModel = try ModelDecoder().decode(Self.self, dictionary)
             } catch {
               onCompletion(nil, Self.convertError(error))
               return
@@ -660,7 +663,7 @@ public extension Model {
           for dictionary in dictionariesTitleToValue {
             var decodedModel: Self
             do {
-              decodedModel = try DatabaseDecoder().decode(Self.self, dictionary)
+              decodedModel = try ModelDecoder().decode(Self.self, dictionary)
             } catch let error {
               onCompletion(nil, Self.convertError(error))
               return

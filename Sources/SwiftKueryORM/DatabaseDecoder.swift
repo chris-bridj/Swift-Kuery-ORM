@@ -28,6 +28,10 @@ open class DatabaseDecoder {
     return try T(from: decoder)
   }
 
+  public required init() {
+
+  }
+
   fileprivate class _DatabaseDecoder : Decoder {
     public var codingPath: [CodingKey]
     public var userInfo: [CodingUserInfoKey:Any] = [:]
