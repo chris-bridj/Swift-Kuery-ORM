@@ -61,7 +61,10 @@ fileprivate struct _DatabaseKeyedEncodingContainer<K: CodingKey> : KeyedEncoding
 
   public mutating func encode<T: Encodable>(_ value: T, forKey key: Key) throws {
     if let dataValue = value as? Data {
-      encoder.values[key.stringValue] = dataValue.base64EncodedString()
+      print("encoding data \(dataValue)")
+      encoder.values[key.stringValue] = dataValue
+    } else if false {  // TODO: what if column is string type?
+      //encoder.values[key.stringValue] = dataValue.base64EncodedString()
     } else if let urlValue = value as? URL {
       encoder.values[key.stringValue] = urlValue.absoluteString
     } else if let uuidValue = value as? UUID {

@@ -180,17 +180,18 @@ open class DatabaseDecoder {
       return try castedValue(unwrappedValue, type, key)
     }
     public func decode<T : Decodable>(_ type: T.Type, forKey key: Key) throws -> T {
-      print(">>>> decoding for key \(key.stringValue.lowercased())")
       let value = try checkValueExitence(key)
-      print(">>>> value : \(value)")
 
       if type is Data.Type && value != nil {
-        print(">>>> target type is Data")
-        return try castedValue(value, type, key)
-       // let castValue = try castedValue(value, String.self, key)
-       // guard let data = Data(base64Encoded: castValue) else {
-       //   throw RequestError(.ormCodableDecodingError, reason: "Error decoding value of Data Type for Key: \(String(describing: key)) , value: \(String(describing: value)) is not base64encoded")
-       // }
+        if let rawData = value as? Data {
+            return rawData as! T
+        } else {
+          let castValue = try castedValue(value, String.self, key)
+          guard let data = Data(base64Encoded: castValue) else {
+            throw RequestError(.ormCodableDecodingError, reason: "Error decoding value of Data Type for Key: \(String(describing: key)) , value: \(String(describing: value)) is not base64encoded")
+          }
+          return data as! T
+        }
       } else if type is URL.Type && value != nil {
         let castValue = try castedValue(value, String.self, key)
         let url = URL(string: castValue)
@@ -202,7 +203,7 @@ open class DatabaseDecoder {
       } else if type is Date.Type && value != nil {
         let castValue = try castedValue(value, Double.self, key)
         let date = Date(timeIntervalSinceReferenceDate: castValue)
-        return try castedValue(date, type, key)
+        return try castedValue(date, type, key)    
       } else {
         throw RequestError(.ormDatabaseDecodingError, reason: "Unsupported type: \(String(describing: type)) for value: \(String(describing: value))")
       }
@@ -291,20 +292,20 @@ open class DatabaseDecoder {
     }
 
     public func decodeIfPresent<T : Decodable>(_ type: T.Type, forKey key: Key) throws -> T? {
-        print(">>>> decoding for key \(key.stringValue.lowercased())")
-        let value = try checkValueExitence(key)
-        print(">>>> value : \(value)")
-        if value == nil {return nil}
+      let value = try checkValueExitence(key)
+      if value == nil {return nil}
 
       if type is Data.Type {
-        print(">>>> target type is Data")
-        return try castedValue(value, Data.self, key) as! T
-//        let castValue = try castedValue(value, String.self, key)
-//        guard let data = Data(base64Encoded: castValue) else {
-//          throw RequestError(.ormCodableDecodingError, reason: "Error decoding value of Data Type for Key: \(String(describing: key)) , value: \(String(describing: value)) is not base64encoded")
-//        }
-//
-//        return data as? T
+        if let rawData = value as? Data {
+            return rawData as? T
+        } else {
+          let castValue = try castedValue(value, String.self, key)
+          guard let data = Data(base64Encoded: castValue) else {
+            throw RequestError(.ormCodableDecodingError, reason: "Error decoding value of Data Type for Key: \(String(describing: key)) , value: \(String(describing: value)) is not base64encoded")
+          }
+
+          return data as? T
+        }
       } else if type is URL.Type {
         let castValue = try castedValue(value, String.self, key)
         let url = URL(string: castValue)

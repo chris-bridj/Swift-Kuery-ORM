@@ -73,6 +73,8 @@ public class TableInfo {
           }
         case .unkeyed(_ as Data.Type, _):
           valueType = String.self
+        case .unkeyed(_ as NSData.Type, _):
+            valueType = String.self
         case .keyed(_ as URL.Type, _):
           valueType = String.self
         case .keyed:
@@ -88,7 +90,7 @@ public class TableInfo {
             idColumnIsSet = true
           } else {
             columns.append(Column(key, SQLType, notNull: !optionalBool))
-          }
+          }        
         } else {
           throw RequestError(.ormTableCreationError, reason: "Type: \(String(describing: valueType)) of Key: \(String(describing: key)) is not a SQLDataType")
         }
