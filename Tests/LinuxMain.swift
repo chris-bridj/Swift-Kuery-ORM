@@ -69,4 +69,6 @@ XCTMain([
     testCase(TestUpdate.allTests.shuffled()),
     testCase(TestDelete.allTests.shuffled()),
     testCase(TestId.allTests.shuffled()),
+    testCase(TestSaveWithBase64EncodedColumn.allTests.shuffled()),
+    testCase(TestFindWithBase64EncodedColumn.allTests.shuffled()),
     ])

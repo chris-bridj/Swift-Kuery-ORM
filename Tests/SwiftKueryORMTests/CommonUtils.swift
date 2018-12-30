@@ -31,6 +31,9 @@ class TestConnection: Connection {
     let result: Result
     var query: Query? = nil
     var raw: String? = nil
+    var parameters: [Any?]? = nil
+
+    let resultFetcherKlass: TestResultFetcher.Type
 
     enum Result {
         case returnEmpty
@@ -40,9 +43,10 @@ class TestConnection: Connection {
         case returnValue
     }
 
-    init(result: Result, withDeleteRequiresUsing: Bool = false, withUpdateRequiresFrom: Bool = false, createAutoIncrement: ((String, Bool) -> String)? = nil) {
+    init(result: Result, resultFetcherKlass: TestResultFetcher.Type, withDeleteRequiresUsing: Bool = false, withUpdateRequiresFrom: Bool = false, createAutoIncrement: ((String, Bool) -> String)? = nil) {
         self.queryBuilder = QueryBuilder(withDeleteRequiresUsing: withDeleteRequiresUsing, withUpdateRequiresFrom: withUpdateRequiresFrom, columnBuilder: TestColumnBuilder())
         self.result = result
+        self.resultFetcherKlass = resultFetcherKlass
     }
 
     func connect(onCompletion: @escaping (QueryResult) -> ()) {
@@ -69,21 +73,25 @@ class TestConnection: Connection {
 
     func execute(query: Query, parameters: [Any?], onCompletion: @escaping ((QueryResult) -> ())) {
         self.query = query
+        self.parameters = parameters
         returnResult(onCompletion)
     }
 
     func execute(_ raw: String, parameters: [Any?], onCompletion: @escaping ((QueryResult) -> ())) {
         self.raw = raw
+        self.parameters = parameters
         returnResult(onCompletion)
     }
 
     func execute(query: Query, parameters: [String:Any?], onCompletion: @escaping ((QueryResult) -> ())) {
         self.query = query
+        self.parameters = Array(parameters.values)
         returnResult(onCompletion)
     }
 
     func execute(_ raw: String, parameters: [String:Any?], onCompletion: @escaping ((QueryResult) -> ()))  {
         self.raw = raw
+        self.parameters = Array(parameters.values)
         returnResult(onCompletion)
     }
 
@@ -104,9 +112,9 @@ class TestConnection: Connection {
         case .returnEmpty:
             onCompletion(.successNoData)
         case .returnOneRow:
-            onCompletion(.resultSet(ResultSet(TestResultFetcher(numberOfRows: 1), connection: self)))
+            onCompletion(.resultSet(ResultSet(resultFetcherKlass.init(numberOfRows: 1), connection: self)))
         case .returnThreeRows:
-            onCompletion(.resultSet(ResultSet(TestResultFetcher(numberOfRows: 3), connection: self)))
+            onCompletion(.resultSet(ResultSet(resultFetcherKlass.init(numberOfRows: 3), connection: self)))
         case .returnError:
             onCompletion(.error(QueryError.noResult("Error in query execution.")))
         case .returnValue:
@@ -145,8 +153,11 @@ class TestConnection: Connection {
     func release(preparedStatement: PreparedStatement, onCompletion: @escaping ((QueryResult) -> ())) {}
 }
 
-class TestResultFetcher: ResultFetcher {
+protocol TestResultFetcher: ResultFetcher {
+    init(numberOfRows: Int)
+}
 
+class TestResultFetcherWithIntColumn: TestResultFetcher {
     func done() {
         return
     }
@@ -156,7 +167,7 @@ class TestResultFetcher: ResultFetcher {
     let titles = ["id", "name", "age"]
     var fetched = 0
 
-    init(numberOfRows: Int) {
+    required init(numberOfRows: Int) {
         self.numberOfRows = numberOfRows
     }
 
@@ -175,12 +186,12 @@ class TestResultFetcher: ResultFetcher {
     }
 }
 
-func createConnection(_ result: TestConnection.Result) -> TestConnection {
-    return TestConnection(result: result)
+func createConnection(_ result: TestConnection.Result, resultFetcherKlass: TestResultFetcher.Type = TestResultFetcherWithIntColumn.self) -> TestConnection {
+    return TestConnection(result: result, resultFetcherKlass: resultFetcherKlass)
 }
 
-func createConnection(withDeleteRequiresUsing: Bool = false, withUpdateRequiresFrom: Bool = false, createAutoIncrement: ((String, Bool) -> String)? = nil) -> TestConnection {
-    return TestConnection(result: .returnEmpty, withDeleteRequiresUsing: withDeleteRequiresUsing, withUpdateRequiresFrom: withUpdateRequiresFrom, createAutoIncrement: createAutoIncrement)
+func createConnection(resultFetcherKlass: TestResultFetcher.Type = TestResultFetcherWithIntColumn.self, withDeleteRequiresUsing: Bool = false, withUpdateRequiresFrom: Bool = false, createAutoIncrement: ((String, Bool) -> String)? = nil) -> TestConnection {
+    return TestConnection(result: .returnEmpty, resultFetcherKlass: resultFetcherKlass, withDeleteRequiresUsing: withDeleteRequiresUsing, withUpdateRequiresFrom: withUpdateRequiresFrom, createAutoIncrement: createAutoIncrement)
 }
 
 // Dummy class for test framework
@@ -209,5 +220,36 @@ class TestColumnBuilder: ColumnCreator {
             result += " NOT NULL"
         }
         return result
+    }
+}
+
+
+func verifyColumnsAndValues(resultQuery: String, expectedDictionary: [String: String]) {
+    //Regex to extract the columns and values of an insert
+    //statement, such as:
+    //INSERT into table (columns) VALUES (values)
+    let regexPattern = ".*\\((.*)\\)[^\\(\\)]*\\((.*)\\)"
+    let groups = resultQuery.capturedGroups(withRegex: regexPattern)
+    XCTAssertEqual(groups.count, 2)
+
+    // Extracting the columns and values from the captured groups
+    let columns = groups[0].filter { $0 != " " }.split(separator: ",")
+    let values = groups[1].filter { $0 != " " && $0 != "'" }.split(separator: ",")
+    // Creating the result dictionary [Column: Value]
+    var resultDictionary: [String: String] = [:]
+    for (column, value) in zip(columns, values) {
+        resultDictionary[String(column)] = String(value)
+    }
+
+    // Asserting the results which the expectations
+    XCTAssertEqual(resultDictionary.count, expectedDictionary.count)
+    for (key, value) in expectedDictionary {
+        XCTAssertNotNil(resultDictionary[key], "Value for key: \(String(describing: key)) is nil in the result dictionary")
+        let values = value.split(separator: ",")
+        var success = false
+        for value in values where resultDictionary[key] == String(value) {
+            success = true
+        }
+        XCTAssertTrue(success)
     }
 }
