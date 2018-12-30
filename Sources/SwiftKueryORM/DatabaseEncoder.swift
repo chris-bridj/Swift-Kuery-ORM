@@ -58,7 +58,9 @@ fileprivate struct _DatabaseKeyedEncodingContainer<K: CodingKey> : KeyedEncoding
   public mutating func encodeNil(forKey key: Key) throws {}
 
   public mutating func encode<T: Encodable>(_ value: T, forKey key: Key) throws {
-    if let dataValue = value as? Data {
+    if let binaryEncodableValue = value as? BinaryEncodableSQLType {
+        encoder.values[key.stringValue] = binaryEncodableValue.asSQLBinary()
+    } else if let dataValue = value as? Data {
       encoder.values[key.stringValue] = dataValue.base64EncodedString()
     } else if let urlValue = value as? URL {
       encoder.values[key.stringValue] = urlValue.absoluteString

@@ -123,6 +123,19 @@ open class DatabaseDecoder {
       }
       return returnValue
     }
+
+    /// Assert decoding of a base64-encoded String into Data - this returns a function based on the given Key
+    private func generateBase64StringConverter(_ key: Key) -> (String) throws -> Data {
+        return { value in
+            let castValue = try self.castedValue(value, String.self, key)
+            if let data = Data(base64Encoded: castValue) {
+                return data
+            } else {
+                throw RequestError(.ormCodableDecodingError, reason: "Error decoding value of Data Type for Key: \(String(describing: key)) , value: \(String(describing: castValue)) is not base64encoded")
+            }
+        }
+    }
+
     public func decode(_ type: Int8.Type, forKey key: Key) throws -> Int8 {
       let unwrappedValue = try unwrapValue(key, checkValueExitence(key))
       return try castedValue(unwrappedValue, type, key)
@@ -177,12 +190,16 @@ open class DatabaseDecoder {
     }
     public func decode<T : Decodable>(_ type: T.Type, forKey key: Key) throws -> T {
       let value = try checkValueExitence(key)
-      if type is Data.Type && value != nil {
+
+      if type is BinaryEncodableSQLType.Type && value != nil {
+        let dataFromString = generateBase64StringConverter(key)
+        let data = try (value as? String).map(dataFromString) ?? castedValue(value, Data.self, key)
+        let metatype = type as! BinaryEncodableSQLType.Type
+        return metatype.init(SQLBinary: data) as! T
+      } else if type is Data.Type && value != nil {
+        let dataFromString = generateBase64StringConverter(key)
         let castValue = try castedValue(value, String.self, key)
-        guard let data = Data(base64Encoded: castValue) else {
-          throw RequestError(.ormCodableDecodingError, reason: "Error decoding value of Data Type for Key: \(String(describing: key)) , value: \(String(describing: value)) is not base64encoded")
-        }
-        return try castedValue(data, type, key)
+        return try dataFromString(castValue) as! T
       } else if type is URL.Type && value != nil {
         let castValue = try castedValue(value, String.self, key)
         let url = URL(string: castValue)
@@ -283,15 +300,13 @@ open class DatabaseDecoder {
     }
 
     public func decodeIfPresent<T : Decodable>(_ type: T.Type, forKey key: Key) throws -> T? {
-      let value = try checkValueExitence(key)
-      if value == nil {return nil}
-      if type is Data.Type {
-        let castValue = try castedValue(value, String.self, key)
-        guard let data = Data(base64Encoded: castValue) else {
-          throw RequestError(.ormCodableDecodingError, reason: "Error decoding value of Data Type for Key: \(String(describing: key)) , value: \(String(describing: value)) is not base64encoded")
-        }
+      guard let value = try checkValueExitence(key) else { return nil }
 
-        return data as? T
+      if type is BinaryEncodableSQLType.Type {
+        let dataFromString = generateBase64StringConverter(key)
+        let data = try (value as? String).map(dataFromString) ?? castedValue(value, Data.self, key)
+        let metatype = type as! BinaryEncodableSQLType.Type
+        return try castedValue(metatype.init(SQLBinary: data), T.self, key)
       } else if type is URL.Type {
         let castValue = try castedValue(value, String.self, key)
         let url = URL(string: castValue)

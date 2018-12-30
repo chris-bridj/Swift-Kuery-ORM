@@ -75,6 +75,8 @@ public class TableInfo {
           valueType = String.self
         case .keyed(_ as URL.Type, _):
           valueType = String.self
+        case .opaque(let t as BinaryEncodableSQLType.Type):
+            valueType = t.self
         case .keyed:
           throw RequestError(.ormTableCreationError, reason: "Nested structs or dictionaries are not supported")
         case .unkeyed:
